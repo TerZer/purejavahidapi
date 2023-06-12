@@ -29,18 +29,26 @@
  */
 package purejavahidapi.windows;
 
+import static com.sun.jna.platform.win32.Kernel32.INSTANCE;
 import static com.sun.jna.platform.win32.WinBase.*;
 import static com.sun.jna.platform.win32.WinBase.INFINITE;
 import static com.sun.jna.platform.win32.WinBase.WAIT_OBJECT_0;
 import static com.sun.jna.platform.win32.WinError.ERROR_DEVICE_NOT_CONNECTED;
 import static com.sun.jna.platform.win32.WinError.ERROR_IO_PENDING;
 import static com.sun.jna.platform.win32.WinError.ERROR_OPERATION_ABORTED;
+import static com.sun.jna.platform.win32.WinNT.FILE_FLAG_OVERLAPPED;
+import static com.sun.jna.platform.win32.WinNT.FILE_SHARE_READ;
+import static com.sun.jna.platform.win32.WinNT.FILE_SHARE_WRITE;
+import static com.sun.jna.platform.win32.WinNT.GENERIC_READ;
+import static com.sun.jna.platform.win32.WinNT.GENERIC_WRITE;
+import static com.sun.jna.platform.win32.WinNT.OPEN_EXISTING;
 import static purejavahidapi.windows.HidLibrary.HidD_FreePreparsedData;
 import static purejavahidapi.windows.HidLibrary.HidD_GetAttributes;
 import static purejavahidapi.windows.HidLibrary.HidD_GetPreparsedData;
 import static purejavahidapi.windows.HidLibrary.HidD_SetFeature;
 import static purejavahidapi.windows.HidLibrary.HidD_SetOutputReport;
 import static purejavahidapi.windows.HidLibrary.HidP_GetCaps;
+import static purejavahidapi.windows.HidLibrary.HidD_GetInputReport;
 import static purejavahidapi.windows.SetupApiLibrary.HIDP_STATUS_SUCCESS;
 import static purejavahidapi.windows.Kernel32Library.*;
 
@@ -69,12 +77,14 @@ public class HidDevice extends purejavahidapi.HidDevice {
 	private OVERLAPPED m_OutputReportOverlapped;
 	private int[] m_OutputReportBytesWritten;
 	private int m_InputReportLength;
+	private Memory m_InputReportMemory;
 	private Thread m_Thread;
 	private SyncPoint m_SyncStart;
 	private SyncPoint m_SyncShutdown;
 	private boolean m_StopThread;
 	private boolean m_ForceControlOutput;
 	private byte[] m_OutputReportArray;
+	private byte[] m_InputReportArray;
 
 	/* package */ HidDevice(purejavahidapi.HidDeviceInfo deviceInfo, WindowsBackend backend) {
 		HANDLE handle = WindowsBackend.openDeviceHandle(deviceInfo.getPath(), false);
@@ -112,6 +122,10 @@ public class HidDevice extends purejavahidapi.HidDevice {
 		};
 
 		m_InputReportLength = caps.InputReportByteLength;
+		if (m_InputReportLength > 0) {
+			m_InputReportMemory = new Memory(m_InputReportLength);
+			m_InputReportArray = new byte[m_InputReportLength];
+		}
 		HidD_FreePreparsedData(ppd[0]);
 
 		m_SyncStart = new SyncPoint(2);
@@ -155,6 +169,24 @@ public class HidDevice extends purejavahidapi.HidDevice {
 		Kernel32.INSTANCE.CloseHandle(m_Handle);
 		m_Backend.removeDevice(m_HidDeviceInfo.getDeviceId());
 		m_Open = false;
+	}
+
+	@Override
+	synchronized public byte[] getInputReport(byte reportID) {
+		if (!m_Open)
+			throw new IllegalStateException("device not open");
+		if (m_InputReportLength == 0)
+			throw new IllegalArgumentException("this device supports no input reports");
+
+		m_InputReportMemory.write(0, new byte[] { reportID }, 0, 1);
+
+		if (!HidD_GetInputReport(m_Handle, m_InputReportMemory, m_InputReportLength)) {
+			// HidD_SetOutputReport() failed. Return error.
+			// register_error(dev, "HidD_SetOutputReport");
+			return null;
+		}
+
+		return m_InputReportMemory.getByteArray(0, m_InputReportLength);
 	}
 
 	@Override

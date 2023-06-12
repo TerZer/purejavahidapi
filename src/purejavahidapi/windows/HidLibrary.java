@@ -359,6 +359,8 @@ public class HidLibrary {
 		boolean HidD_GetPhysicalDescriptor(HANDLE HidDeviceObject,Pointer Buffer,int BufferLength);
 		
 		boolean HidD_SetOutputReport(HANDLE HidDeviceObject, byte[] ReportBuffer, int ReportBufferLength);
+
+		boolean HidD_GetInputReport(HANDLE HidDeviceObject, Pointer ReportBuffer, int ReportBufferLength);
 	}
 
 	static public boolean HidD_GetAttributes(HANDLE HidDeviceObject, HIDD_ATTRIBUTES Attributes) {
@@ -419,6 +421,10 @@ public class HidLibrary {
 
 	static public boolean HidD_SetOutputReport(HANDLE HidDeviceObject, byte[] ReportBuffer, int ReportBufferLength){
 		return INSTANCE.HidD_SetOutputReport(HidDeviceObject, ReportBuffer, ReportBufferLength);
+	}
+
+	static public boolean HidD_GetInputReport(HANDLE HidDeviceObject, Pointer ReportBuffer, int ReportBufferLength){
+		return INSTANCE.HidD_GetInputReport(HidDeviceObject, ReportBuffer, ReportBufferLength);
 	}
 
 }

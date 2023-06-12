@@ -250,4 +250,7 @@ abstract public class HidDevice {
 	 */
 	abstract public void close();
 
+	public byte[] getInputReport(byte reportID) {
+		throw new RuntimeException("Not implemented");
+	}
 }
